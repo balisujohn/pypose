@@ -385,10 +385,10 @@ class LieGroup(torch.Tensor):
         return self.view(*shape+(self.gtype.dimension,))
 
     def Exp(self):
-        r"""The exponential map.
+        r"""The logarthmic  map.
         
         .. math::
-            \exp: \mathfrak{g} \mapsto G
+            \exp: \mathfrak{G} \mapsto g
 
         Returns:
             LieGroup: The Lie group element
@@ -397,9 +397,27 @@ class LieGroup(torch.Tensor):
         return self.gtype.Exp(self)
 
     def Log(self):
+        r"""The exponential map.
+        
+        .. math::
+            \log: \mathfrak{g} \mapsto G
+
+        Returns:
+            LieGroup: The Lie group element
+
+        """
         return self.gtype.Log(self)
 
     def Inv(self):
+        r"""The Inverse map.
+        
+        .. math::
+            \Inverse: \mathfrak{G} \mapsto G
+
+        Returns:
+            LieGroup: The Lie group element
+
+        """
         return self.gtype.Inv(self)
 
     def Act(self, p):
