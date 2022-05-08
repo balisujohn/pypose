@@ -1288,6 +1288,132 @@ def Jinvp(input, p):
         >>> x.Jinvp(a) # equivalent to: pp.Jinvp(x, a)
             tensor([[ 0.1730, -1.3778,  0.1657,  0.1820],
                     [-1.0347,  1.6627,  0.3992,  0.1227]])
+
+    The batched left Jacobian of a :obj:`LieTensor`.
+
+        Args:
+            input (LieTensor): the input LieTensor (either Lie Group or Lie Algebra)
+
+        Return:
+            Tensor: the left Jacobian matrices
+
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`SO3_type` or :obj:`so3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SO3` or :meth:`so3`).
+      Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` represent the Lie Algebra of :math:`\mathbf{x}_i`, 
+      :math:`\boldsymbol{\Phi}_i` be the skew matrix (:meth:`pypose.vec2skew`) of :math:`\boldsymbol{\phi}_i`:
+
+        .. math::
+            \mathbf{J}_i(\mathbf{x}_i) = \mathbf{I} + c_1 \boldsymbol{\Phi}_i +
+            c_2 \boldsymbol{\Phi}_i^2
+
+      where :math:`\mathbf{I}` is the identity matrix with the same dimension as :math:`\boldsymbol{\Phi}_i`, and 
+
+        .. math::
+            c_1 = \left\{
+                    \begin{array}{ll} 
+                        \frac{1 - \cos\theta_i}{\theta_i^2}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{2}-\frac{1}{24}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
+        .. math::
+            c_2 = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{6}-\frac{1}{120}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` are :obj:`SE3_type` or :obj:`se3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`SE3` or :meth:`se3`).
+      Let :math:`\boldsymbol{\phi}_i = \theta_i\mathbf{n}_i` be the corresponding Lie Algebra of the SO3/so3 part of 
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\tau}_i` be the Lie Algebra of the translation part of :math:`\mathbf{x}_i`; 
+      :math:`\boldsymbol{\Phi}_i` and :math:`\boldsymbol{\Tau}_i` be the skew matrices, respectively:
+
+        .. math::
+            \mathbf{J}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{J}_i(\boldsymbol{\Phi}_i) & \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) \\
+                                    \mathbf{0} & \mathbf{J}_i(\boldsymbol{\Phi}_i)
+                                \end{array}
+                             \right]
+
+        where :math:`\mathbf{J}_i(\boldsymbol{\Phi}_i)` is the left Jacobian of the SO3/so3 part of :math:`\mathbf{x}_i`.
+        :math:`\mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i)` is 
+
+        .. math::
+            \begin{align*}
+                \mathbf{Q}_i(\boldsymbol{\tau}_i, \boldsymbol{\phi}_i) = \frac{1}{2}\boldsymbol{\Tau}_i &+ c_1
+                (\boldsymbol{\Phi_i\Tau_i} + \boldsymbol{\Tau_i\Phi_i} + \boldsymbol{\Phi_i\Tau_i\Phi_i}) \\
+                 &+ c_2 (\boldsymbol{\Phi_i^2\Tau_i} + \boldsymbol{\Tau_i\Phi_i^2} - 3\boldsymbol{\Phi_i\Tau_i\Phi_i})\\
+                 &+ c_3 (\boldsymbol{\Phi_i\Tau_i\Phi_i^2} + \boldsymbol{\Phi_i^2\Tau_i\Phi_i})  
+            \end{align*}
+
+        where,
+
+        .. math::
+            c_1 = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta_i - \sin\theta_i}{\theta_i^3}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{6}-\frac{1}{120}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
+        .. math::
+            c_2 = \left\{
+                    \begin{array}{ll} 
+                        \frac{\theta_i^2 +2\cos\theta_i - 2}{2\theta_i^4}, \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{24}-\frac{1}{720}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.
+
+        .. math::
+            c_3 = \left\{
+                    \begin{array}{ll} 
+                        \frac{2\theta_i - 3\sin\theta_i + \theta_i\cos\theta_i}{2\theta_i^5}, 
+                        \quad \|\theta_i\| > \text{eps}, \\
+                        \frac{1}{120}-\frac{1}{2520}\theta_i^2,
+                        \quad \|\theta_i\| \leq \text{eps}
+                    \end{array}
+                    \right.  
+
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`Sim3_type` or :obj:`sim3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`Sim3` or :meth:`sim3`).
+      The left Jacobian can be approximated as:
+
+        .. math::
+            \mathbf{J}_i(\mathbf{x}_i) = \sum_{n=0}\frac{1}{(n+1)!}(\boldsymbol{\xi}_i^{\curlywedge})^n
+
+        where :math:`n = 0, 1, 2, 3, 4`.
+        :math:`\boldsymbol{\xi}_i^{\curlywedge} = \mathrm{adj}(\boldsymbol{\xi}_i^{\wedge})` and :math:`\mathrm{adj}` 
+        is the adjoint of the Lie algebra :math:`\mathfrak{sim}(3)`, e.g., :math:`\boldsymbol{\xi}_i \in \mathfrak{sim}(3)`.
+        Notice that if notate :math:`\boldsymbol{X}_i = \mathrm{Adj}(\mathbf{x}_i)` and :math:`\mathrm{Adj}` 
+        is the adjoint of the Lie group :math:`\mathrm{Sim}(3)`, there is a nice property:
+        :math:`\mathrm{Adj}(\mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})) = \mathrm{Exp}(\mathrm{adj}(\boldsymbol{\xi}_i^{\wedge}))`, 
+        or :math:`\boldsymbol{X}_i = \mathrm{Exp}(\boldsymbol{\xi}_i^{\curlywedge})`.
+        
+
+    * If input :math:`\mathbf{x}`'s :obj:`ltype` is :obj:`RxSO3_type` or :obj:`rxso3_type`
+      (input :math:`\mathbf{x}` is an instance of :meth:`RxSO3` or :meth:`rxso3`).
+      Let :math:`\boldsymbol{\phi}_i` be the corresponding Lie Algebra of the SO3 part of
+      :math:`\mathbf{x}_i`, :math:`\boldsymbol{\Phi}_i` be the skew matrix (:meth:`pypose.vec2skew`),
+      The left Jacobian of :math:`\mathbf{x}_i` is the same as that for the SO3 part of :math:`\mathbf{x}_i`.
+
+        .. math::
+            \mathbf{J}_i(\mathbf{x}_i) = \left[
+                                \begin{array}{cc} 
+                                    \mathbf{J}_i(\boldsymbol{\Phi}_i) & \mathbf{0} \\
+                                    \mathbf{0} & 1
+                                \end{array}
+                             \right]
+
+        where :math:`\mathbf{J}_i(\boldsymbol{\Phi}_i)` is the
+        inverse of left Jacobian of the SO3 part of :math:`\mathbf{x}_i`.
+
     """
     return input.Jinvp(p)
 
