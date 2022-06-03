@@ -142,11 +142,12 @@ class LieType:
         return cls.identity(*args, **kwargs)
 
     def randn_like(self, *args, sigma=1, **kwargs):
-        return self.randn(*args, sigma=1, **kwargs)
+        return self.randn(*args, sigma=sigma, **kwargs)
 
     def randn(self, *args, sigma=1., **kwargs):
+        # LieTensor.randn only samples rotation
         scaled_sigma = 2.*sigma/math.sqrt(3)
-        return scaled_sigma * torch.randn(*(tuple(args)+self.manifold), **kwargs)
+        return scaled_sigma * torch.randn(*(tuple(args)+torch.Size([3])), **kwargs)
 
     @classmethod
     def __op__(cls, lid, op, x, y=None):
@@ -205,9 +206,12 @@ class SO3Type(LieType):
         data = torch.tensor([0., 0., 0., 1.], **kwargs)
         return LieTensor(data.expand(size+(-1,)), ltype=SO3_type)
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = so3_type.Exp(so3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SO3_type).requires_grad_(requires_grad)
+
+    def randn_like(self, *args, sigma=1.0, **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
     def matrix(self, X):
         """ To 3x3 matrix """
@@ -239,9 +243,12 @@ class so3Type(LieType):
     def identity(cls, *size, **kwargs):
         return SO3_type.Log(SO3_type.identity(*size, **kwargs))
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=1.0, requires_grad=False, **kwargs):
         data = super().randn(*size, sigma=sigma, **kwargs).detach()
         return LieTensor(data, ltype=so3_type).requires_grad_(requires_grad)
+    
+    def randn_like(self, *args, sigma=1.0, **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
     def matrix(self, lietensor):
         """ To 3x3 matrix """
@@ -276,9 +283,12 @@ class SE3Type(LieType):
         data = torch.tensor([0., 0., 0., 0., 0., 0., 1.], **kwargs)
         return LieTensor(data.expand(size+(-1,)), ltype=SE3_type)
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
+    def randn(self, *size, sigma=[1,1], requires_grad=False, **kwargs):
         data = se3_type.Exp(se3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=SE3_type).requires_grad_(requires_grad)
+
+    def randn_like(self, *args, sigma=[1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 class se3Type(LieType):
@@ -293,9 +303,19 @@ class se3Type(LieType):
     def identity(cls, *size, **kwargs):
         return SE3_type.Log(SE3_type.identity(*size, **kwargs))
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*size, sigma=sigma, **kwargs).detach()
-        return LieTensor(data, ltype=se3_type).requires_grad_(requires_grad)
+    def randn(self, *size, sigma=[1,1], requires_grad=False, **kwargs):
+        # rotation part
+        rotation_data = super().randn(*size, sigma=sigma[-1], **kwargs).detach()
+        # transation part
+        if len(sigma)==2:
+            transation_data = sigma[0] * torch.randn(*(tuple(size)+torch.Size([3])), **kwargs)
+        else:
+            assert len(sigma)==4, 'input sigma should be either 2-dimensional ([transation_sigma, rotation_sigma]) or 4-dimensional ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma]).'
+            transation_data = torch.cat([sigma[0] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs), sigma[1] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs), sigma[2] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs)], dim=1)
+        return LieTensor(torch.cat([transation_data, rotation_data], dim=1), ltype=se3_type).requires_grad_(requires_grad)
+
+    def randn_like(self, *args, sigma=[1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 class Sim3Type(LieType):
@@ -315,6 +335,9 @@ class Sim3Type(LieType):
         data = sim3_type.Exp(sim3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=Sim3_type).requires_grad_(requires_grad)
 
+    def randn_like(self, *args, sigma=[1.0,1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
+
 
 class sim3Type(LieType):
     def __init__(self):
@@ -328,9 +351,20 @@ class sim3Type(LieType):
     def identity(cls, *size, **kwargs):
         return Sim3_type.Log(Sim3_type.identity(*size, **kwargs))
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*size, sigma=sigma, **kwargs).detach()
-        return LieTensor(data, ltype=sim3_type).requires_grad_(requires_grad)
+    def randn(self, *size, sigma=[1.0,1.0,1.0], requires_grad=False, **kwargs):
+        # rotation part
+        rotation_data = super().randn(*size, sigma=sigma[-2], **kwargs).detach()
+        scale_data = sigma[-1] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs)
+        if len(sigma)==3:
+            # rotation part
+            transation_data = sigma[0] * torch.randn(*(tuple(size)+torch.Size([3])), **kwargs)
+        else:
+            assert len(sigma)==5, 'input sigma should be either 3-dimensional ([transation_sigma, rotation_sigma, scale_sigma]) or 5-dimensional ([transation_sigma_x, transation_sigma_y, transation_sigma_z, rotation_sigma, scale_sigma]).'
+            transation_data = torch.cat([sigma[0] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs), sigma[1] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs), sigma[2] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs)], dim=1)
+        return LieTensor(torch.cat([transation_data, rotation_data, scale_data], dim=1), ltype=sim3_type).requires_grad_(requires_grad)
+
+    def randn_like(self, *args, sigma=[1.0,1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 class RxSO3Type(LieType):
@@ -350,6 +384,9 @@ class RxSO3Type(LieType):
         data = rxso3_type.Exp(rxso3_type.randn(*size, sigma=sigma, **kwargs)).detach()
         return LieTensor(data, ltype=RxSO3_type).requires_grad_(requires_grad)
 
+    def randn_like(self, *args, sigma=[1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
+
 
 class rxso3Type(LieType):
     def __init__(self):
@@ -363,9 +400,16 @@ class rxso3Type(LieType):
     def identity(cls, *size, **kwargs):
         return RxSO3_type.Log(RxSO3_type.identity(*size, **kwargs))
 
-    def randn(self, *size, sigma=1, requires_grad=False, **kwargs):
-        data = super().randn(*size, sigma=sigma, **kwargs).detach()
-        return LieTensor(data, ltype=rxso3_type).requires_grad_(requires_grad)
+    def randn(self, *size, sigma=[1.0,1.0], requires_grad=False, **kwargs):
+        assert len(sigma)==2, 'input sigma should be 2-dimensional ([rotation_sigma, scale_sigma]).'
+        # rotation part
+        rotation_data = super().randn(*size, sigma=sigma[0], **kwargs).detach()
+        # transation part
+        scale_data = sigma[1] * torch.randn(*(tuple(size)+torch.Size([1])), **kwargs)
+        return LieTensor(torch.cat([rotation_data, scale_data], dim=1), ltype=rxso3_type).requires_grad_(requires_grad)
+
+    def randn_like(self, *args, sigma=[1.0,1.0], **kwargs):
+        return self.randn(*args, sigma=sigma, **kwargs)
 
 
 SO3_type, so3_type = SO3Type(), so3Type()
