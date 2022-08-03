@@ -10,6 +10,7 @@ from .basics import vec2skew, cumops, cummul, cumprod
 from .basics import cumops_, cummul_, cumprod_
 from .common_types import _size_any_t, _size_2_t, _size_35_t, _size_24_t, convert_sig_se, convert_sig_sim, convert_sig_rxs
 import collections
+from .operation import RxSO3_Log, SE3_Log, SO3_Log, Sim3_Log, rxso3_Exp, se3_Exp, sim3_Exp, so3_Exp
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
@@ -206,7 +207,8 @@ class SO3Type(LieType):
         super().__init__(1, 4, 4, 3)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = SO3_Log.apply(X)
         return LieTensor(x, ltype=so3_type)
 
     @classmethod
@@ -251,7 +253,8 @@ class so3Type(LieType):
         super().__init__(1, 3, 4, 3)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = so3_Exp.apply(x)
         return LieTensor(X, ltype=SO3_type)
 
     @classmethod
@@ -302,7 +305,8 @@ class SE3Type(LieType):
         super().__init__(3, 7, 7, 6)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = SE3_Log.apply(X)
         return LieTensor(x, ltype=se3_type)
 
     def rotation(self, input):
@@ -333,7 +337,8 @@ class se3Type(LieType):
         super().__init__(3, 6, 7, 6)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = se3_Exp.apply(x)
         return LieTensor(X, ltype=SE3_type)
 
     def rotation(self, input):
@@ -366,7 +371,8 @@ class Sim3Type(LieType):
         super().__init__(4, 8, 8, 7)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = Sim3_Log.apply(X)
         return LieTensor(x, ltype=sim3_type)
 
     def rotation(self, input):
@@ -400,7 +406,8 @@ class sim3Type(LieType):
         super().__init__(4, 7, 8, 7)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = sim3_Exp.apply(x)
         return LieTensor(X, ltype=Sim3_type)
 
     def rotation(self, input):
@@ -436,7 +443,8 @@ class RxSO3Type(LieType):
         super().__init__(2, 5, 5, 4)
 
     def Log(self, X):
-        x = self.__op__(self.lid, log, X)
+        X = X.tensor() if hasattr(X, 'ltype') else X
+        x = RxSO3_Log.apply(X)
         return LieTensor(x, ltype=rxso3_type)
 
     def rotation(self, input):
@@ -467,7 +475,8 @@ class rxso3Type(LieType):
         super().__init__(2, 4, 5, 4)
 
     def Exp(self, x):
-        X = self.__op__(self.lid, exp, x)
+        x = x.tensor() if hasattr(x, 'ltype') else x
+        X = rxso3_Exp.apply(x)
         return LieTensor(X, ltype=RxSO3_type)
 
     def rotation(self, input):
@@ -635,7 +644,11 @@ class LieTensor(torch.Tensor):
                 grad_fn=<AliasBackward0>)
     """
     def __init__(self, *data, ltype:LieType):
-        assert self.shape[-1:] == ltype.dimension, 'Dimension Invalid. Go to{}'.format(
+        assert self.shape[-1:] == ltype.dimension, 'The last dimension of a LieTensor has to be ' \
+            'corresponding to their LieType. More details go to {}. If this error happens in an ' \
+            'optimization process, where LieType is not a necessary structure, we suggest to '    \
+            'call .tensor() to convert a LieTensor to Tensor before passing it to an optimizer. ' \
+            'If this still happens, create an issue on GitHub please.'.format(
             'https://pypose.org/docs/generated/pypose.LieTensor/#pypose.LieTensor')
         self.ltype = ltype
 
