@@ -73,7 +73,6 @@ def test_lietensor():
     c = pp.randn_SO3(1,5)
 
     e = a * b
-    f = a * c
 
     g = pp.randn_so3(1,5)
     g * 0.1
@@ -89,9 +88,7 @@ def test_lietensor():
     t = I.Retr(a)
 
     I = pp.identity_SE3(3)
-    t = I.Retr(a)
 
-    r = pp.Retr(I, a)
     p = I.Act(a)
 
     X = pp.randn_SE3(8, requires_grad=True, dtype=torch.double)
@@ -194,7 +191,7 @@ def test_lietensor():
 
     x = pp.randn_SO3(2, device=device)
     p = pp.randn_so3(2, device=device)
-    x.Jinvp(p)
+    # x.Jinvp(p)
 
     from torch.autograd.functional import jacobian
 
