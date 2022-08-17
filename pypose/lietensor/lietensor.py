@@ -1,13 +1,9 @@
 
 import math, numbers
 import torch, warnings
-from torch import nn, linalg
-from torch import Tensor
-from torch.utils._pytree import tree_map, tree_flatten
-
 from torch.types import _size
-from .common_types import _size_any_t, convert_sig_se, convert_sig_sim, convert_sig_rxs
-import collections
+from torch import Tensor, nn, linalg
+from torch.utils._pytree import tree_map, tree_flatten
 from .backends import exp, log, inv, mul, adj
 from .backends import adjT, jinvp, act3, act4, toMatrix
 from .basics import vec2skew, cumops, cummul, cumprod
@@ -19,6 +15,7 @@ from .operation import SO3_Act, SE3_Act, RxSO3_Act, Sim3_Act
 from .operation import SO3_Act4, SE3_Act4, RxSO3_Act4, Sim3_Act4
 from .operation import SO3_Mul, SE3_Mul, RxSO3_Mul, Sim3_Mul
 from .operation import SO3_Inv, SE3_Inv, RxSO3_Inv, Sim3_Inv
+from .common_types import _size_any_t, convert_sig_se, convert_sig_sim, convert_sig_rxs
 
 
 HANDLED_FUNCTIONS = ['__getitem__', '__setitem__', 'cpu', 'cuda', 'float', 'double',
