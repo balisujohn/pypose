@@ -1,6 +1,6 @@
 import torch as torch
 
-class DP_LQR_new:
+class DP_LQR:
 
     def __init__(self, n_state, n_ctrl, T, current_x=None, current_u=None):
         
@@ -10,7 +10,7 @@ class DP_LQR_new:
         self.current_x = current_x
         self.current_u = current_u
 
-    def DP_LQR_backward_new(self, C, c, F, f):
+    def DP_LQR_backward(self, C, c, F, f):
 
         Ks = []
         ks = []
@@ -59,7 +59,7 @@ class DP_LQR_new:
 
         return Ks, ks
 
-    def DP_LQR_forward_new(self, x_init, C, c, F, f, Ks, ks):
+    def DP_LQR_forward(self, x_init, C, c, F, f, Ks, ks):
         x = self.current_x
         u = self.current_u
         #current_cost = None
@@ -67,6 +67,7 @@ class DP_LQR_new:
         new_u = []
         new_x = [x_init]
         objs = []
+        tau = []
 
         for t in range(self.T):
             t_rev = self.T-1-t
@@ -89,10 +90,42 @@ class DP_LQR_new:
             obj = 0.5*new_xut.unsqueeze(1).bmm(C[t]).bmm(new_xut.unsqueeze(2)).squeeze(1).squeeze(1) + torch.bmm(new_xut.unsqueeze(1), c[t].unsqueeze(2)).squeeze(1).squeeze(1)
             objs.append(obj)
 
+            tau.append(new_xut)
+
         objs = torch.stack(objs)
             #current_cost = torch.sum(objs, dim=0)
 
         new_u = torch.stack(new_u)
         new_x = torch.stack(new_x)
 
-        return new_x, new_u, objs #,current_X
+        return new_x, new_u, objs, tau #,current_X
+
+
+    def DP_LQR_costates(self, tau, C, c, F):
+
+        lambda_dual = []
+
+        for t in range(self.T-1, -1, -1):
+            t_rev_new = self.T-1-t
+            tau_t = tau[t_rev_new]
+            Ct = C[t]
+            ct = c[t]
+            Ft = F[t]
+            n_state = self.n_state
+            Ct_x = Ct[:, :n_state, :]
+            ct_x = ct[:, :n_state]
+
+            if t == self.T-1:
+                lambda_final = lambda_tp1 = Ct_x.bmm(tau_t.unsqueeze(2)).squeeze(2) + ct_x
+            else: 
+                Ft_T = Ft.transpose(1,2)
+                Ft_x_T = Ft_T[:, :n_state, :]
+                lambda_t = Ft_x_T .bmm(lambda_tp1.unsqueeze(2)).squeeze(2) + Ct_x.bmm(tau_t.unsqueeze(2)).squeeze(2) + ct_x
+                lambda_tp1 = lambda_t
+                lambda_dual.append(lambda_t)
+        
+        lambda_dual.reverse()
+        lambda_dual.append(lambda_final)
+        lambda_dual = torch.stack(lambda_dual)
+
+        return lambda_dual

@@ -6,7 +6,7 @@ import cvxpy as cp
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def LQR_cp_new(C, c, F, f, x_init, T, n_state, n_ctrl): 
+def LQR_cp(C, c, F, f, x_init, T, n_state, n_ctrl): 
 
     tau = cp.Variable((n_state+n_ctrl, T))
 
@@ -27,7 +27,7 @@ def LQR_cp_new(C, c, F, f, x_init, T, n_state, n_ctrl):
     return torch.tensor(tau.value), torch.tensor([obj_t.value for obj_t in objs])
 
 
-def test_LQR_linear_new():
+def test_LQR_linear():
     torch.manual_seed(0)
 
     n_batch = 2
@@ -44,7 +44,7 @@ def test_LQR_linear_new():
     f = torch.tile(torch.randn(n_state), (T, n_batch, 1))
     x_init = torch.randn(n_batch, n_state)
 
-    tau_cp, objs_cp = LQR_cp_new(C[:,0], c[:,0], F[:,0], f[:,0], x_init[0], T, n_state, n_ctrl)
+    tau_cp, objs_cp = LQR_cp(C[:,0], c[:,0], F[:,0], f[:,0], x_init[0], T, n_state, n_ctrl)
     tau_cp = tau_cp.T
     x_cp = tau_cp[:,:n_state]
     u_cp = tau_cp[:,n_state:]
@@ -53,14 +53,42 @@ def test_LQR_linear_new():
         for x in [C, c, R, S, F, f, x_init]]
 
     u_lqr = None
-    LQR_DP  = pp.module.DP_LQR_new(n_state, n_ctrl, T, None, None)
-    Ks, ks = LQR_DP.DP_LQR_backward_new(C, c, F, f)
-    x_lqr, u_lqr, objs_lqr = LQR_DP.DP_LQR_forward_new(x_init, C, c, F, f, Ks, ks)
+    LQR_DP  = pp.module.DP_LQR(n_state, n_ctrl, T, None, None)
+    Ks, ks = LQR_DP.DP_LQR_backward(C, c, F, f)
+    x_lqr, u_lqr, objs_lqr, tau = LQR_DP.DP_LQR_forward(x_init, C, c, F, f, Ks, ks)
     tau_lqr = torch.cat((x_lqr, u_lqr), 2)
     assert torch.allclose(tau_cp, tau_lqr[:,0]) 
+
+    lambda_dual = LQR_DP.DP_LQR_costates(tau, C, c, F)
+    
+    lambda_dual_test = []
+    Cs = []
+    for t in range(T-1, -1, -1):
+        t_rev_new = T-1-t
+        tau_t = tau[t_rev_new]
+        Ct = C[t]
+        ct = c[t]
+        Ft = F[t]
+        Ct_x = Ct[:, :n_state, :]
+        ct_x = ct[:, :n_state]
+
+        if t == T-1:
+            lambda_final_test = lambda_tp1_test = Ct_x.bmm(tau_t.unsqueeze(2)).squeeze(2) + ct_x
+        else: 
+            Ft_T = Ft.transpose(1,2)
+            Ft_x_T = Ft_T[:, :n_state, :]
+            lambda_t_test = Ft_x_T .bmm(lambda_tp1_test.unsqueeze(2)).squeeze(2) + Ct_x.bmm(tau_t.unsqueeze(2)).squeeze(2) + ct_x
+            lambda_tp1_test = lambda_t_test
+            lambda_dual_test.append(lambda_t_test)
+            
+    lambda_dual_test.reverse()
+    lambda_dual_test.append(lambda_final_test)
+    lambda_dual_test= torch.stack(lambda_dual_test)
+
+    assert torch.allclose(lambda_dual, lambda_dual_test)
 
     print("Done")
 
 
 if __name__ == '__main__':
-    test_LQR_linear_new()
+    test_LQR_linear()
